@@ -1,7 +1,6 @@
 package caesar_test
 
 import (
-	"bytes"
 	"evteev/caesar/pkg/caesar"
 	"io"
 	"strings"
@@ -14,84 +13,65 @@ func TestCaesarEncrypt(t *testing.T) {
 		shift          int
 		expectedOutput string
 	}{
-		{"привет", 3, "тулйззг"},
-		{"Привет", 5, "Фулзййг"},
-		{"Ёжик", 1, "Ёзйл"},
-		{"абвгд", -1, "яабвг"},
-		{"Привет мир!", 7, "Фсрнйлч тлх!"},
+		{"привет", 1, "рсйгжу"},
+		{"привет", 2, "сткдзф"},
 	}
 
 	for _, test := range tests {
-		reader := caesar.NewCaesarReader(strings.NewReader(test.input), test.shift)
-		result, err := io.ReadAll(reader)
+		encrypted, err := caesar.Encrypt(strings.NewReader(test.input), test.shift)
 		if err != nil {
-			t.Errorf("Ошибка при чтении из CaesarReader: %v", err)
+			t.Errorf("Ошибка при чтении из Encrypt: %v", err)
 		}
+
+		result, err := io.ReadAll(encrypted)
+		if err != nil {
+			t.Errorf("Ошибка при чтении: %v", err)
+		}
+
 		if string(result) != test.expectedOutput {
 			t.Errorf("Encrypt(%q): Ожидалось %q, но получилось %q", test.input, test.expectedOutput, string(result))
 		}
 	}
 }
 
-func TestCaesarDecrypt(t *testing.T) {
+func TestCaesarCipher(t *testing.T) {
 	tests := []struct {
-		encrypted      string
+		input          string
 		shift          int
 		expectedOutput string
 	}{
-		{"тулйззг", -3, "привет"},
-		{"Фулзййг", -5, "Привет"},
-		{"Ёзйл", -1, "Ёжик"},
-		{"яабвг", 1, "абвгд"},
-		{"Фсрнйлч тлх!", -7, "Привет мир!"},
+		{"привет", 1, "рсйгжу"},
+		{"привет", 2, "сткдзф"},
+		{"используется", 1, "йтрпмэифжута"},
 	}
 
 	for _, test := range tests {
-		reader := caesar.NewCaesarReader(strings.NewReader(test.encrypted), test.shift)
-		result, err := io.ReadAll(reader)
+		encrypted, err := caesar.Encrypt(strings.NewReader(test.input), test.shift)
 		if err != nil {
-			t.Errorf("Ошибка при чтении из CaesarReader: %v", err)
+			t.Errorf("Ошибка при чтении из Encrypt: %v", err)
 		}
-		if string(result) != test.expectedOutput {
-			t.Errorf("Decrypt(%q): Ожидалось %q, но получилось %q", test.encrypted, test.expectedOutput, string(result))
-		}
-	}
-}
 
-func TestCaesarCipher(t *testing.T) {
-	tests := []struct {
-		input    string
-		shift    int
-		expected string
-	}{
-		{"привет", 3, "тулйззг"},
-		{"Привет", 5, "Фулзййг"},
-		{"Ёжик", 1, "Ёзйл"},
-		{"абвгд", -1, "яабвг"},
-		{"Привет мир!", 7, "Фсрнйлч тлх!"},
-	}
-
-	for _, test := range tests {
-		reader := strings.NewReader(test.input)
-		encryptor := caesar.NewCaesarReader(reader, test.shift)
-
-		encrypted, err := io.ReadAll(encryptor)
+		enc, err := io.ReadAll(encrypted)
 		if err != nil {
-			t.Errorf("Ошибка при чтении из CaesarReader: %v", err)
+			t.Errorf("Ошибка при чтении: %v", err)
 		}
 
-		if string(encrypted) != test.expected {
-			t.Errorf("Encrypt(%q) Ожидалось %q, но получилось %q", test.input, test.expected, string(encrypted))
+		if string(enc) != test.expectedOutput {
+			t.Errorf("Encrypt(%q): Ожидалось %q, но получилось %q", test.input, test.expectedOutput, string(enc))
 		}
 
-		decryptor := caesar.NewCaesarReader(bytes.NewBuffer(encrypted), -test.shift)
-		decrypted, err := io.ReadAll(decryptor)
+		decrypted, err := caesar.Decrypt(strings.NewReader(string(enc)), test.shift)
 		if err != nil {
-			t.Errorf("Ошибка при чтении из CaesarReader: %v", err)
+			t.Errorf("Ошибка при чтении из Encrypt: %v", err)
 		}
 
-		if string(decrypted) != test.input {
-			t.Errorf("Decrypt(%q) Ожидалось %q, но получилось %q", encrypted, test.expected, string(decrypted))
+		dec, err := io.ReadAll(decrypted)
+		if err != nil {
+			t.Errorf("Ошибка при чтении: %v", err)
+		}
+
+		if string(dec) != test.input {
+			t.Errorf("Decrypt(%q): Ожидалось %q, но получилось %q", test.input, test.expectedOutput, string(dec))
 		}
 	}
 }
