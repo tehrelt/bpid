@@ -24,11 +24,14 @@ func process(input io.Reader, shift int) (output io.Reader, err error) {
 	var result bytes.Buffer
 
 	for _, r := range string(data) {
-		// Шифруем только русские буквы (а-я, А-Я)
 		if r >= 'а' && r <= 'я' {
-			r = ((r-'а'+rune(shift))%32+32)%32 + 'а' // модуль 33 для обертывания
+			r = ((r-'а'+rune(shift))%32+32)%32 + 'а'
 		} else if r >= 'А' && r <= 'Я' {
-			r = ((r-'А'+rune(shift))%32+32)%32 + 'А' // модуль 33 для обертывания
+			r = ((r-'А'+rune(shift))%32+32)%32 + 'А'
+		} else if r >= 'a' && r <= 'z' {
+			r = ((r-'a'+rune(shift))%26+26)%26 + 'a'
+		} else if r >= 'A' && r <= 'Z' {
+			r = ((r-'A'+rune(shift))%26+26)%26 + 'A'
 		}
 		result.WriteRune(r)
 	}
