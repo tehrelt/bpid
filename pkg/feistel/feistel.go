@@ -2,93 +2,157 @@ package feistel
 
 import (
 	"bytes"
-	"encoding/binary"
+	"crypto/sha256"
 	"fmt"
 	"io"
 )
 
-type FeisterCipher struct {
-	keys []uint32
+const (
+	BLOCK_SIZE  = 16
+	PARTS_COUNT = 4
+)
+
+type FeistelCipher struct {
+	key    []byte
+	rounds int
 }
 
-func New(keys []uint32) *FeisterCipher {
-	return &FeisterCipher{keys: keys}
-}
-
-// F - простая функция преобразования, которая используется в сети Фейстеля
-func F(right uint32, key uint32) uint32 {
-	// Простая функция F: здесь можно использовать любую другую функцию
-	return right ^ key // Пример: XOR с ключом
-}
-
-// process - основной алгоритм Фейстеля
-func (c *FeisterCipher) process(left uint32, right uint32, decrypt bool) (uint32, uint32) {
-	if decrypt {
-		// Если дешифруем, то перебираем ключи в обратном порядке
-		for i := len(c.keys) - 1; i >= 0; i-- {
-			temp := left
-			left = right ^ F(left, c.keys[i])
-			right = temp
-		}
-	} else {
-		// Если шифруем, то перебираем ключи в прямом порядке
-		for _, key := range c.keys {
-			temp := right
-			right = left ^ F(right, key)
-			left = temp
-		}
+func New(key []byte, rounds ...int) *FeistelCipher {
+	if len(key) != 16 {
+		panic("key must be 16 bytes long")
 	}
-	return left, right
+
+	if rounds == nil {
+		rounds = []int{8}
+	}
+
+	return &FeistelCipher{key: key, rounds: rounds[0]}
 }
 
-// Encrypt шифрует данные с использованием сети Фейстеля
-func (c *FeisterCipher) Encrypt(input io.Reader) (output io.Reader, err error) {
-	data, err := io.ReadAll(input)
+func (c *FeistelCipher) f(in []byte) []byte {
+	out := bytes.Clone(in)
+
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i] ^ c.key[i%BLOCK_SIZE]
+	}
+
+	return out
+}
+
+func (c *FeistelCipher) Encrypt(in io.Reader) (io.Reader, error) {
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, err
 	}
 
-	// Разделяем данные на 64 бита (8 байт) для шифрования
-	if len(data) < 8 {
-		return nil, fmt.Errorf("недостаточно данных для шифрования")
-	}
+	data = c.pad(data)
+	encoded := c.encrypt(data)
 
-	left := binary.BigEndian.Uint32(data[:4])   // Левая половина
-	right := binary.BigEndian.Uint32(data[4:8]) // Правая половина
-
-	// Шифрование
-	left, right = c.process(left, right, false)
-
-	// Собираем зашифрованные данные обратно
-	var result bytes.Buffer
-	binary.Write(&result, binary.BigEndian, left)
-	binary.Write(&result, binary.BigEndian, right)
-
-	return bytes.NewReader(result.Bytes()), nil
+	return bytes.NewReader(encoded), nil
 }
 
-// Decrypt дешифрует данные с использованием сети Фейстеля
-func (c *FeisterCipher) Decrypt(input io.Reader) (output io.Reader, err error) {
-	data, err := io.ReadAll(input)
+func (c *FeistelCipher) Decrypt(in io.Reader) (io.Reader, error) {
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, err
 	}
 
-	// Разделяем данные на 64 бита (8 байт) для дешифрования
-	if len(data) < 8 {
-		return nil, fmt.Errorf("недостаточно данных для дешифрования")
+	decoded := c.decrypt(data)
+	decoded = c.unpad(decoded)
+
+	return bytes.NewReader(decoded), nil
+}
+
+func (c *FeistelCipher) split(in []byte, count int) ([][]byte, int) {
+	size := len(in) / count
+
+	parts := make([][]byte, count)
+	for i := 0; i < count; i++ {
+		parts[i] = in[i*size : (i+1)*size]
 	}
 
-	left := binary.BigEndian.Uint32(data[:4])   // Левая половина
-	right := binary.BigEndian.Uint32(data[4:8]) // Правая половина
+	return parts, size
+}
 
-	// Дешифрование
-	left, right = c.process(left, right, true)
+func (c *FeistelCipher) encrypt(in []byte) []byte {
 
-	// Собираем расшифрованные данные обратно
-	var result bytes.Buffer
-	binary.Write(&result, binary.BigEndian, left)
-	binary.Write(&result, binary.BigEndian, right)
+	parts, partSize := c.split(in, PARTS_COUNT)
 
-	return bytes.NewReader(result.Bytes()), nil
+	for i := 0; i < c.rounds; i++ {
+		fout := c.f(parts[0])
+
+		x2 := make([]byte, partSize)
+		x3 := make([]byte, partSize)
+		x4 := make([]byte, partSize)
+
+		for i, b := range fout {
+			x2[i] = parts[1][i] ^ b
+			x3[i] = parts[2][i] ^ b
+			x4[i] = parts[3][i] ^ b
+		}
+
+		parts = [][]byte{x2, x3, x4, parts[0]}
+	}
+
+	out := make([]byte, 0, len(in))
+
+	for i := range PARTS_COUNT {
+		out = append(out, parts[i]...)
+	}
+
+	return out
+}
+
+func (c *FeistelCipher) decrypt(in []byte) []byte {
+	parts, partSize := c.split(in, PARTS_COUNT)
+
+	for i := 0; i < c.rounds; i++ {
+		parts = [][]byte{parts[3], parts[0], parts[1], parts[2]}
+		fout := c.f(parts[0])
+		x2 := make([]byte, partSize)
+		x3 := make([]byte, partSize)
+		x4 := make([]byte, partSize)
+
+		for i, b := range fout {
+			x2[i] = parts[1][i] ^ b
+			x3[i] = parts[2][i] ^ b
+			x4[i] = parts[3][i] ^ b
+		}
+
+		parts[1] = x2
+		parts[2] = x3
+		parts[3] = x4
+	}
+
+	out := make([]byte, 0, len(in))
+
+	for i := range PARTS_COUNT {
+		out = append(out, parts[i]...)
+	}
+
+	if len(in) != len(out) {
+		panic(fmt.Sprintf("watafak len(in)=(%d) != len(out)=(%d)", len(in), len(out)))
+	}
+
+	return out
+}
+
+func (c *FeistelCipher) pad(in []byte) []byte {
+	pad_len := BLOCK_SIZE - len(in)%BLOCK_SIZE
+	return append(in, bytes.Repeat([]byte{byte(pad_len)}, pad_len)...)
+}
+
+func (c *FeistelCipher) unpad(in []byte) []byte {
+	pad_len := int(in[len(in)-1])
+
+	if pad_len <= len(in) {
+		return in[:len(in)-pad_len]
+	}
+
+	return in
+}
+
+func GenerateKeyFromString(in string) []byte {
+	hash := sha256.Sum256([]byte(in))
+	return hash[:16]
 }
