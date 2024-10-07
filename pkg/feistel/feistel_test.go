@@ -1,10 +1,9 @@
 package feistel_test
 
 import (
-	"bytes"
-	"tehrelt/bpid/cipher/pkg/feistel"
 	"io"
 	"strings"
+	"tehrelt/bpid/cipher/pkg/feistel"
 	"testing"
 )
 
@@ -27,10 +26,7 @@ func TestFeistelCipher(t *testing.T) {
 			t.Errorf("Encrypt(%q) throw error: %v", test.input, err)
 		}
 
-		buf := new(bytes.Buffer)
-		io.Copy(buf, encrypted)
-
-		decrypted, err := cipher.Decrypt(buf)
+		decrypted, err := cipher.Decrypt(encrypted)
 		if err != nil {
 			t.Errorf("Decrypt(%q) throw error: %v", test.input, err)
 		}
