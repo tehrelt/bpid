@@ -1,3 +1,7 @@
 *.exe
-rename.sh
 cover.html
+
+# tools
+rename.sh
+count.py
+output.txt

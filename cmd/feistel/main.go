@@ -1,7 +1,7 @@
 package main
 
 import (
-	"tehrelt/bpid/cipher/pkg/feistel"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -9,31 +9,66 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"tehrelt/bpid/cipher/pkg/feistel"
 )
+
+type arrayFlag []string
+
+func (i *arrayFlag) String() string {
+	buf := new(strings.Builder)
+
+	for _, v := range *i {
+		fmt.Fprintf(buf, "%s ", v)
+	}
+
+	return buf.String()
+}
+func (i *arrayFlag) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+var (
+	mode string
+	in   string
+	keys arrayFlag
+	out  string
+)
+
+func init() {
+	flag.StringVar(&in, "in", "", "input file")
+	flag.StringVar(&out, "out", "", "out file")
+	flag.StringVar(&mode, "mode", "", "encrypt or decrypt")
+	flag.Var(&keys, "k", "list of keys. usage: -k key1 -k key2")
+}
 
 func main() {
 
-	if len(os.Args) < 4 {
-		fmt.Printf("Usage: %s <(encrypt|e)|(decrypt|d)> <path> <key> [out]\n", os.Args[0])
-		return
+	flag.Parse()
+
+	if in == "" {
+		log.Fatal("input file is not set. try -h for help\n")
 	}
 
-	mode := os.Args[1]
-	path := os.Args[2]
-	key := os.Args[3]
+	if mode == "" {
+		log.Fatal("mode is not set. try -h for help\n")
+	}
+
+	if len(keys) == 0 {
+		log.Fatal("keys are not set. try -h for help\n")
+	}
 
 	var file *os.File
 	var err error
 
-	file, err = os.Open(path)
+	file, err = os.Open(in)
 	if err != nil {
-		slog.Error("cannot open file", slog.String("err", err.Error()), slog.Any("filename", path))
+		slog.Error("cannot open file", slog.String("err", err.Error()), slog.Any("filename", in))
 		return
 	}
 	defer file.Close()
-	slog.Debug("file opened", slog.String("filename", path))
 
-	keys := feistel.GenerateKeyFromString(key)
+	keys := feistel.GenerateKeysFromString(keys)
 
 	cipher := feistel.New(keys)
 
@@ -52,10 +87,11 @@ func main() {
 		}
 
 		outname := func() string {
-			if len(os.Args) > 4 {
-				return os.Args[4]
+			if out != "" {
+				return out
 			}
-			return fmt.Sprintf("%s/enc_feistel_%s", filepath.Dir(path), filepath.Base(path))
+
+			return fmt.Sprintf("%s/enc_feistel_%s", filepath.Dir(in), filepath.Base(in))
 		}()
 
 		if err := os.WriteFile(outname, content, 0666); err != nil {
@@ -78,10 +114,10 @@ func main() {
 		}
 
 		outname := func() string {
-			if len(os.Args) > 4 {
-				return os.Args[4]
+			if out != "" {
+				return out
 			}
-			return fmt.Sprintf("%s/dec_feistel_%s", filepath.Dir(path), filepath.Base(path))
+			return fmt.Sprintf("%s/dec_feistel_%s", filepath.Dir(in), filepath.Base(in))
 		}()
 
 		if err := os.WriteFile(outname, content, 0666); err != nil {
