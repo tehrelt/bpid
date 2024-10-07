@@ -1,7 +1,7 @@
 package main
 
 import (
-	"evteev/cipher/pkg/caesar"
+	"tehrelt/bpid/cipher/pkg/caesar"
 	"fmt"
 	"io"
 	"log/slog"

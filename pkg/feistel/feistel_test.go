@@ -2,7 +2,7 @@ package feistel_test
 
 import (
 	"bytes"
-	"evteev/cipher/pkg/feistel"
+	"tehrelt/bpid/cipher/pkg/feistel"
 	"io"
 	"strings"
 	"testing"

@@ -1,7 +1,7 @@
 package caesar_test
 
 import (
-	"evteev/cipher/pkg/caesar"
+	"tehrelt/bpid/cipher/pkg/caesar"
 	"io"
 	"strings"
 	"testing"

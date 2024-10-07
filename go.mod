@@ -1,3 +1,3 @@
-module evteev/cipher
+module tehrelt/bpid/cipher
 
-go 1.22.1
+go 1.22

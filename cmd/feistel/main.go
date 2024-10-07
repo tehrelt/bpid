@@ -1,7 +1,7 @@
 package main
 
 import (
-	"evteev/cipher/pkg/feistel"
+	"tehrelt/bpid/cipher/pkg/feistel"
 	"fmt"
 	"io"
 	"log"
