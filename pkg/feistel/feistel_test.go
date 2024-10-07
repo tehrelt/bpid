@@ -42,7 +42,7 @@ func TestFeistelCipher(t *testing.T) {
 		}
 
 		if string(dec) != test.input {
-			t.Errorf(test.input + " не совпадает с " + string(dec))
+			t.Errorf("%q не совпадает %q", test.input, string(dec))
 		}
 
 		t.Logf("%q -> %q", test.input, string(dec))
