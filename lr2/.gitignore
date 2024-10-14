@@ -1,0 +1,7 @@
+*.exe
+cover.html
+
+# tools
+rename.sh
+count.py
+output.txt
